@@ -1,0 +1,10 @@
+mdbook serve
+http://localhost:3000/
+
+source run_on_pynq.tcl
+
+cargo build
+
+rustup target add armv7a-none-eabi
+
+https://github.com/hegza/alien-shooter-template-rs
