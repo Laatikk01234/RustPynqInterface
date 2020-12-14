@@ -27,12 +27,17 @@ use core::{ffi::c_void, panic::PanicInfo};
 // communicating between threads in interrupt-driven concurrency.
 pub static mut A_GLOBAL: usize = 0;
 
+pub static mut COLUMN: usize = 1;
+pub static mut HIDASTIN: usize = 1;
+
 // Define the address of the ordinary LED interface in physical memory. Putting
 // bits into the LED address the right way may cause desired blinking of
 // hardware LEDs.
 // FIXME: 0x00000000 is not the LED address. The correct address can be found in
 // some of the provided documentation.
 pub const LED_ADDRESS: *mut u8 = 0x00000000 as *mut u8;
+
+
 
 // The #[start] attribute is usually not necessary, but we need to show the
 // cross-compiler where to start executing. The underscore before the argument
@@ -64,6 +69,12 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
     // Prints up to 64 characters using standard Rust [print formatting](https://doc.rust-lang.org/std/fmt/index.html).
     println64!("Hello Rust!");
+    
+    unsafe {
+    COLUMN <<= 1;
+    println64!("{}",COLUMN);
+    }
+    //println64!("{}",0b10000 & 0b01000);
 
     // Empty loop to keep the program running while the interrupt handlers do all the
     // work
@@ -110,7 +121,16 @@ pub unsafe extern "C" fn tick_handler(callback_ref: *mut c_void) {
     xil::Xil_ExceptionDisable();
 
     // TODO: Write code here
+     run(COLUMN);
 
+        if COLUMN & 0b10000000 > 0 {
+            COLUMN >>= 7;
+        
+        } else {
+            COLUMN <<= 1;
+        }
+
+ 
     // End of your code
 
     // Cast `void*` received from the C API to the "Triple Timer Counter" (TTC)
