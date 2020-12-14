@@ -25,7 +25,6 @@ use core::{ffi::c_void, panic::PanicInfo};
 
 // Declare static globals like in the C-version. This is a reasonable way of
 // communicating between threads in interrupt-driven concurrency.
-pub static mut A_GLOBAL: usize = 0;
 
 pub static mut COLUMN: usize = 1;
 pub static mut HIDASTIN: usize = 1;
@@ -56,7 +55,6 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
         // compiler cannot verify soundness in a case where an interrupt causes
         // simultaneous access from another thread. Thus we must make sure ourselves,
         // not to do that.
-        A_GLOBAL = 0;
     }
 
     unsafe {
@@ -69,10 +67,8 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
     // Prints up to 64 characters using standard Rust [print formatting](https://doc.rust-lang.org/std/fmt/index.html).
     println64!("Hello Rust!");
-    
     unsafe {
-    COLUMN <<= 1;
-    println64!("{}",COLUMN);
+    setup_clock(0,0,0);
     }
     //println64!("{}",0b10000 & 0b01000);
 
@@ -153,7 +149,13 @@ pub unsafe extern "C" fn tick_handler(callback_ref: *mut c_void) {
 /// for details.
 pub unsafe extern "C" fn tick_handler_1(callback_ref: *mut c_void) {
     // TODO: Write code here
-
+    if (HIDASTIN >= 10) {
+        run_clock();
+        HIDASTIN = 0;
+    } else {
+        HIDASTIN += 1;
+    }
+        
     // End of your code
 
     // Clear timer interrupt status
