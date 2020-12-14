@@ -3,12 +3,8 @@ use crate::{println64, print64};
 use crate::xil;
 use crate::LED_ADDRESS;
 
-const PAGE_SIZE: usize = 10;
-
-pub static mut PAGE: usize = 0;
 
 /// Table for dots. Indices are page, x, y, color. Initialized to zero.
-//static mut DOTS: [[[[u8; PAGE_SIZE]; 8]; 8]; 3] = [[[[0; PAGE_SIZE]; 8]; 8]; 3];
 static mut DOTS: [[[u8; 3]; 8]; 8] = [[[0; 3]; 8]; 8];
 
 //pub const LED_ADDRESS: *mut u8 = 0x00000000 as *mut u8;
@@ -22,6 +18,22 @@ const CLK_CTRL: *mut u8 = 0x00000000 as *mut u8;
 
 
 pub unsafe fn setup_led_matrix() {
+    // Tip: use the following to set an ADDRESS to zero:
+    /*
+    core::ptr::write_volatile(ADDRESS, 0);
+    */
+
+    // The screen must be reset at start
+    // Tip: use the following one-liners to flip bits on or off at ADDRESS. Oh
+    // yes, it's a zero-cost lambda function in an embedded application.
+    /*
+    mutate_ptr(ADDR, |x| x | 1);
+    mutate_ptr(ADDR, |x| x ^ 1);
+    */
+
+    // TODO: Write code that sets 6-bit values in register of DM163 chip. It is
+    // recommended that every bit in that register is set to 1. 6-bits and 24
+    // "bytes", so some kind of loop structure could be nice
 
     core::ptr::write_volatile(COLORSHIELD_ADDRESS, 0);
     //reset board (twice?)
@@ -51,40 +63,34 @@ pub unsafe fn setup_led_matrix() {
         
     }
     latch();
+    
 
-    set_pixel(2,3,1,0,0);
-    set_pixel(4,6,1,0,0);
-    set_pixel(7,7,0,0,1);
-    set_pixel(1,7,0,0,1);
-    set_pixel(0,0,0,1,0);
-    set_pixel(0,3,0,1,0);
-    set_pixel(3,0,0,1,0);
-    // Tip: use the following to set an ADDRESS to zero:
-    /*
-    core::ptr::write_volatile(ADDRESS, 0);
-    */
+    
+    set_pixel(1,3,0,1,0);
+    set_pixel(8,8,1,0,0);
+    set_pixel(3,4,0,0,1);
+    set_pixel(3,1,0,255,0);
+    
 
-    // The screen must be reset at start
-    // Tip: use the following one-liners to flip bits on or off at ADDRESS. Oh
-    // yes, it's a zero-cost lambda function in an embedded application.
-    /*
-    mutate_ptr(ADDR, |x| x | 1);
-    mutate_ptr(ADDR, |x| x ^ 1);
-    */
-
-    // TODO: Write code that sets 6-bit values in register of DM163 chip. It is
-    // recommended that every bit in that register is set to 1. 6-bits and 24
-    // "bytes", so some kind of loop structure could be nice
 }
 
 /// Set the value of one pixel at the LED matrix. Function is unsafe because it
 /// uses global memory
+/// coordinates in range 1-8 and colors of 0,255.
 unsafe fn set_pixel(x: usize, y: usize, r: u8, g: u8, b: u8) {
-    DOTS[x][y][0] = r;
-    DOTS[x][y][1] = g;
-    DOTS[x][y][2] = b;
-    // TODO: Set new pixel value. Take the parameeters and put them into the
+    // Set new pixel value. Take the parameeters and put them into the
     // DOTS array.
+
+    if (x >= 1 && x <= 8)
+        && (y >= 1 && y <= 8) {
+        DOTS[x-1][y-1][0] = r;
+        DOTS[x-1][y-1][1] = g;
+        DOTS[x-1][y-1][2] = b;
+
+    } else {
+        println64!("Bad coordinate values");
+    }
+
 }
 
 /// Refresh new data into the LED matrix. Hint: This function is supposed to
@@ -108,24 +114,17 @@ pub unsafe fn run(c: usize) {
         128 => {row = 7},
         _ => {row = 0},
     }
-    //println64!("{}",DOTS[2][3][0]);
     
-	for column in 0..8  {
-    //println64!("{}",column);   
+	for column in (0..8).rev()  { 
 		for rgb in (0..3).rev() {
-        //println64!("{}",rgb);
-			if (DOTS[row][column][rgb] == 1) {
+			if (DOTS[row][column][rgb] >= 1) {
                 mutate_ptr(COLORSHIELD_ADDRESS, |x| x | 0b10000);
-				//colcmd |= 0b10000;
 			} else {
                 mutate_ptr(COLORSHIELD_ADDRESS, |x| x & !0b10000);
-				//colcmd &= ~0b10000;
 			}
 			for _ in 0..8 {
                 mutate_ptr(COLORSHIELD_ADDRESS, |x| x & !0b01000);
                 mutate_ptr(COLORSHIELD_ADDRESS, |x| x | 0b01000);
-				//colcmd &= ~0b01000;
-				//colcmd |= 0b01000;
 			}
 		}
 	}

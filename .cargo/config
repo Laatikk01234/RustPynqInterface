@@ -1,5 +1,5 @@
 [target.armv7a-none-eabi]
-linker = "arm-none-eabi-gcc"
+linker = "D:/Koulujuttuja/A2020Juttuja/SDK/2019.1/gnu/aarch32/nt/gcc-arm-none-eabi/bin/arm-none-eabi-gcc.exe"
 rustflags = [
    "-C", "link-arg=-mcpu=cortex-a9",
    "-C", "link-arg=-mfpu=vfpv3",
