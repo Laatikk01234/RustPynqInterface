@@ -251,78 +251,20 @@ pub unsafe fn setup_led_matrix() {
     activate_6_bit_bank();
 
     for _i in 0..24 {
-        let mut brightness: u8 = 0b000111;
-        for _x in 0..6 {
-            if brightness & 0b100000 > 0 {
+        let brightness = 2;
+        for x in 0..6 {
+            if x > brightness {
                 set_input(true);
             } else {
                 set_input(false);
             }
             tick_clock();
-            brightness<<=1;
         }
     }
     latch();
 
 }
-/*
-pub unsafe fn setup_led_matrix() {
-    // Tip: use the following to set an ADDRESS to zero:
-    /*
-    core::ptr::write_volatile(ADDRESS, 0);
-    */
 
-    // The screen must be reset at start
-    // Tip: use the following one-liners to flip bits on or off at ADDRESS. Oh
-    // yes, it's a zero-cost lambda function in an embedded application.
-    /*
-    mutate_ptr(ADDR, |x| x | 1);
-    mutate_ptr(ADDR, |x| x ^ 1);
-    */
-
-    // TODO: Write code that sets 6-bit values in register of DM163 chip. It is
-    // recommended that every bit in that register is set to 1. 6-bits and 24
-    // "bytes", so some kind of loop structure could be nice
-
-    core::ptr::write_volatile(COLORSHIELD_ADDRESS, 0);
-    //reset board (twice?)
-    mutate_ptr(COLORSHIELD_ADDRESS, |x| x & 0b00000);
-    //set input 0, clock 0, shift bank low, latch low, reset off
-    mutate_ptr(COLORSHIELD_ADDRESS, |x| x | 0b00001);
-
-    for _i in 0..24 {
-        let mut brightness: u8 = 0b000111;
-        
-        for _x in 0..6 {
-            //set brightness accoring to its value
-            if (brightness & 0b100000) > 0 { 
-                //input 1 tai 0 riippuen brightness arvosta
-                mutate_ptr(COLORSHIELD_ADDRESS, |x| x | 0b10000);
-            } else {
-                mutate_ptr(COLORSHIELD_ADDRESS, |x| x & !0b10000);
-            }
-
-            //kello alas
-            mutate_ptr(COLORSHIELD_ADDRESS,|x| x & !0b01000);
-            //kello ylos
-            mutate_ptr(COLORSHIELD_ADDRESS,|x| x | 0b01000);
-            brightness<<=1;
-        
-        }
-        
-    }
-    latch();
-    
-
-    
-    set_pixel(1,3,0,1,0);
-    set_pixel(8,8,1,0,0);
-    set_pixel(3,4,0,0,1);
-    set_pixel(3,1,0,255,0);
-    
-
-}
-*/
 /// Set the value of one pixel at the LED matrix. Function is unsafe because it
 /// uses global memory
 /// coordinates in range 1-8 and colors of 0,255.
@@ -344,8 +286,7 @@ unsafe fn set_pixel(x: usize, y: usize, r: u8, g: u8, b: u8) {
 
 pub unsafe fn run(c: usize) {
 
-    core::ptr::write_volatile(COLORSHIELD_ADDRESS,0b00101);
-    //mutate_ptr(COLORSHIELD_ADDRESS, |x| x | ?)
+    activate_8_bit_bank();
 
 
     let row: usize;
@@ -367,13 +308,12 @@ pub unsafe fn run(c: usize) {
 	for column in (0..8).rev()  { 
 		for rgb in (0..3).rev() {
 			if DOTS[row][column][rgb] >= 1 {
-                mutate_ptr(COLORSHIELD_ADDRESS, |x| x | 0b10000);
+                set_input(true);
 			} else {
-                mutate_ptr(COLORSHIELD_ADDRESS, |x| x & !0b10000);
+                set_input(false);
 			}
 			for _ in 0..8 {
-                mutate_ptr(COLORSHIELD_ADDRESS, |x| x & !0b01000);
-                mutate_ptr(COLORSHIELD_ADDRESS, |x| x | 0b01000);
+                tick_clock();
 			}
 		}
 	}
@@ -388,77 +328,10 @@ pub unsafe fn run(c: usize) {
     // TODO: Write into the LED matrix driver (8-bit data). Use values from DOTS
     // array.
 }
-/// Refresh new data into the LED matrix. Hint: This function is supposed to
-/// send 24-bytes and parameter x is for x-coordinate.
-/*
-pub unsafe fn run(c: usize) {
 
-    core::ptr::write_volatile(COLORSHIELD_ADDRESS,0b00101);
-    //mutate_ptr(COLORSHIELD_ADDRESS, |x| x | ?)
-
-
-    let row: usize;
-    match c {
-        0b1 => {row = 0},
-        0b10 => {row = 1},
-        0b100 => {row = 2},
-        0b1000 => {row = 3},
-        0b10000 => {row = 4},
-        0b100000 => {row = 5},
-        0b1000000 => {row = 6},
-        0b10000000 => {row = 7},
-        _ => {row = 0},
-    }
-
-    //lights off for the duration of pushing new values to show
-    open_line(0);
-
-	for column in (0..8).rev()  { 
-		for rgb in (0..3).rev() {
-			if DOTS[row][column][rgb] >= 1 {
-                mutate_ptr(COLORSHIELD_ADDRESS, |x| x | 0b10000);
-			} else {
-                mutate_ptr(COLORSHIELD_ADDRESS, |x| x & !0b10000);
-			}
-			for _ in 0..8 {
-                mutate_ptr(COLORSHIELD_ADDRESS, |x| x & !0b01000);
-                mutate_ptr(COLORSHIELD_ADDRESS, |x| x | 0b01000);
-			}
-		}
-	}
-    
-	latch();
-    
-
-    open_line(c as u8);
-
-
-
-    // TODO: Write into the LED matrix driver (8-bit data). Use values from DOTS
-    // array.
-}
-*/
-/*
-/// Latch signal for the colors shield. See colorsshield.pdf for how latching
-/// works.
-unsafe fn latch() {
-    //latch locks bits at rising edge -> set latch on and off.
-    mutate_ptr(COLORSHIELD_ADDRESS, |x| x | 0b00010);
-    mutate_ptr(COLORSHIELD_ADDRESS, |x| x & !0b00010);
-}
-*/
 /// Sets one line, matching with the parameter, as active.
 pub unsafe fn open_line(i: u8) {
     core::ptr::write_volatile(CHANNEL_ADDRESS, i);
-
-    // TODO: Write code here.
-    // Tip: use a `match` statement for the parameter:
-    /*
-    match i {
-        0 => {},
-        _ => {},
-    }
-    */
 }
 
 pub unsafe fn setup_clock(hours: u8, minutes: u8, seconds: u8) {
