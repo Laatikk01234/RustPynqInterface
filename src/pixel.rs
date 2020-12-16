@@ -4,11 +4,20 @@ use crate::xil;
 //use crate::LED_ADDRESS;
 
 
+//statics for clock
+static mut IS_SETUP: bool = false;
+static mut SECONDS: u8 = 0;
+static mut MINUTES: u8 = 0;
+static mut HOURS: u8 = 0;
+
 /// Table for dots. Indices are page, x, y, color. Initialized to zero.
 static mut DOTS: [[[u8; 3]; 8]; 8] = [[[0; 3]; 8]; 8];
 
 // Memory address for colorshield functionality
 const COLORSHIELD_ADDRESS: *mut u8 = 0x41220008 as *mut u8;
+
+// ColorShield struct that is used to operate colorshield.
+static mut COLOR_SHIELD: ColorShield = ColorShield::constructor();
 
 // Memory address for active channels
 const CHANNEL_ADDRESS: *mut u8 = 0x41220000 as *mut u8;
@@ -103,66 +112,160 @@ impl ColorShield {
     println64!();
     }
 
+    unsafe fn set_input(&mut self, value: bool) {
+        self.input = value;
+            if (self.input == true) {
+                mutate_ptr(self.memory_address, |x| x | 0b10000);
+            } else {
+                mutate_ptr(self.memory_address, |x| x & !0b10000);
+            }
+    }
+
+    unsafe fn set_clock(&mut self, value: bool) {
+        self.clock = value;
+            if (self.clock == true) {
+                mutate_ptr(self.memory_address, |x| x | 0b01000);
+            } else {
+                mutate_ptr(self.memory_address, |x| x & !0b01000);
+            }
+    }
+
+    unsafe fn set_bank(&mut self, value: bool) {
+        self.bank = value;
+            if (self.bank == true) {
+                mutate_ptr(self.memory_address, |x| x | 0b00100);
+            } else {
+                mutate_ptr(self.memory_address, |x| x & !0b00100);
+            }
+    }
+
+    unsafe fn set_latch(&mut self, value: bool) {
+        self.latch = value;
+            if (self.latch == true) {
+                mutate_ptr(self.memory_address, |x| x | 0b00010);
+            } else {
+                mutate_ptr(self.memory_address, |x| x & !0b00010);
+            }
+    }
+
+    unsafe fn set_reset(&mut self, value: bool) {
+        self.reset = value;
+            if (self.reset == true) {
+                mutate_ptr(self.memory_address, |x| x | 0b00001);
+            } else {
+                mutate_ptr(self.memory_address, |x| x & !0b00001);
+            }
+    }
+
+    //reset
+    unsafe fn reset(&mut self) {
+        unsafe {
+            self.set_reset(false);
+            self.set_reset(true);
+        }
+    }
+
+    //tick_clock
+    unsafe fn tick_clock(&mut self) {
+        unsafe {
+            self.set_clock(false);
+            self.set_clock(true);
+        }
+    }
+
+    //latch
+    unsafe fn latch(&mut self) {
+        unsafe {
+            self.set_latch(true);
+            self.set_latch(false);
+        }
+    }
+
+    //activate 6-bit bank
+    unsafe fn activate_6_bit_bank(&mut self) {
+        unsafe {
+            self.set_bank(false);
+        }
+    }
+
+    //activate 8-bit bank
+    unsafe fn activate_8_bit_bank(&mut self) {
+        unsafe {
+            self.set_bank(true);
+        }
+    }
 }
+
 
 pub unsafe fn color_shield_status() {
     COLOR_SHIELD.print_status();
 }
 
-static mut COLOR_SHIELD: ColorShield = ColorShield::constructor();
-/*
-static mut COLOR_SHIELD: ColorShield = ColorShield {
-    memory_address: 0x41220008 as *mut u8,
-    input: false,
-    clock: false,
-    bank: false,
-    latch: false,
-    reset: false,
-};
-
-
-pub unsafe fn color_shield_status() {
-    println64!("Bits: {:05b}",core::ptr::read_volatile(COLOR_SHIELD.memory_address));
-    println64!("-> colorshields active channels are:");
-    println64!("input = {}",COLOR_SHIELD.input);
-    println64!("clock = {}",COLOR_SHIELD.clock);
-    println64!("bank = {}",COLOR_SHIELD.bank);
-    println64!("latch = {}",COLOR_SHIELD.latch);
-    println64!("reset = {}",COLOR_SHIELD.reset);
-    println64!();
-}
-
 pub unsafe fn set_input(value: bool) {
-    Colorinput = value;
-    if (input = true) {
-        
-    } else {
-
-    }
+    COLOR_SHIELD.set_input(value);
 }
-*/
 
 pub unsafe fn set_clock(value: bool) {
-
+    COLOR_SHIELD.set_clock(value);
 }
 
 pub unsafe fn set_bank(value: bool) {
-
+    COLOR_SHIELD.set_bank(value);
 }
 
 pub unsafe fn set_latch(value: bool) {
-
+    COLOR_SHIELD.set_latch(value);
 }
 
 pub unsafe fn set_reset(value: bool) {
+    COLOR_SHIELD.set_reset(value);
+}
+
+//reset
+pub unsafe fn reset() {
+    COLOR_SHIELD.reset();
+}
+
+//tick_clock
+pub unsafe fn tick_clock() {
+    COLOR_SHIELD.tick_clock();
+}
+
+//latch
+pub unsafe fn latch() {
+    COLOR_SHIELD.latch();
+}
+
+//activate 6-bit bank
+pub unsafe fn activate_6_bit_bank() {
+    COLOR_SHIELD.activate_6_bit_bank();
+}
+
+//activate 8-bit bank
+pub unsafe fn activate_8_bit_bank() {
+    COLOR_SHIELD.activate_8_bit_bank();
+}
+
+pub unsafe fn setup_led_matrix() {
+    reset();
+    activate_6_bit_bank();
+
+    for _i in 0..24 {
+        let mut brightness: u8 = 0b000111;
+        for _x in 0..6 {
+            if brightness & 0b100000 > 0 {
+                set_input(true);
+            } else {
+                set_input(false);
+            }
+            tick_clock();
+            brightness<<=1;
+        }
+    }
+    latch();
 
 }
-//statics for clock
-static mut IS_SETUP: bool = false;
-static mut SECONDS: u8 = 0;
-static mut MINUTES: u8 = 0;
-static mut HOURS: u8 = 0;
-
+/*
 pub unsafe fn setup_led_matrix() {
     // Tip: use the following to set an ADDRESS to zero:
     /*
@@ -219,7 +322,7 @@ pub unsafe fn setup_led_matrix() {
     
 
 }
-
+*/
 /// Set the value of one pixel at the LED matrix. Function is unsafe because it
 /// uses global memory
 /// coordinates in range 1-8 and colors of 0,255.
@@ -239,8 +342,6 @@ unsafe fn set_pixel(x: usize, y: usize, r: u8, g: u8, b: u8) {
 
 }
 
-/// Refresh new data into the LED matrix. Hint: This function is supposed to
-/// send 24-bytes and parameter x is for x-coordinate.
 pub unsafe fn run(c: usize) {
 
     core::ptr::write_volatile(COLORSHIELD_ADDRESS,0b00101);
@@ -287,7 +388,57 @@ pub unsafe fn run(c: usize) {
     // TODO: Write into the LED matrix driver (8-bit data). Use values from DOTS
     // array.
 }
+/// Refresh new data into the LED matrix. Hint: This function is supposed to
+/// send 24-bytes and parameter x is for x-coordinate.
+/*
+pub unsafe fn run(c: usize) {
 
+    core::ptr::write_volatile(COLORSHIELD_ADDRESS,0b00101);
+    //mutate_ptr(COLORSHIELD_ADDRESS, |x| x | ?)
+
+
+    let row: usize;
+    match c {
+        0b1 => {row = 0},
+        0b10 => {row = 1},
+        0b100 => {row = 2},
+        0b1000 => {row = 3},
+        0b10000 => {row = 4},
+        0b100000 => {row = 5},
+        0b1000000 => {row = 6},
+        0b10000000 => {row = 7},
+        _ => {row = 0},
+    }
+
+    //lights off for the duration of pushing new values to show
+    open_line(0);
+
+	for column in (0..8).rev()  { 
+		for rgb in (0..3).rev() {
+			if DOTS[row][column][rgb] >= 1 {
+                mutate_ptr(COLORSHIELD_ADDRESS, |x| x | 0b10000);
+			} else {
+                mutate_ptr(COLORSHIELD_ADDRESS, |x| x & !0b10000);
+			}
+			for _ in 0..8 {
+                mutate_ptr(COLORSHIELD_ADDRESS, |x| x & !0b01000);
+                mutate_ptr(COLORSHIELD_ADDRESS, |x| x | 0b01000);
+			}
+		}
+	}
+    
+	latch();
+    
+
+    open_line(c as u8);
+
+
+
+    // TODO: Write into the LED matrix driver (8-bit data). Use values from DOTS
+    // array.
+}
+*/
+/*
 /// Latch signal for the colors shield. See colorsshield.pdf for how latching
 /// works.
 unsafe fn latch() {
@@ -295,7 +446,7 @@ unsafe fn latch() {
     mutate_ptr(COLORSHIELD_ADDRESS, |x| x | 0b00010);
     mutate_ptr(COLORSHIELD_ADDRESS, |x| x & !0b00010);
 }
-
+*/
 /// Sets one line, matching with the parameter, as active.
 pub unsafe fn open_line(i: u8) {
     core::ptr::write_volatile(CHANNEL_ADDRESS, i);
