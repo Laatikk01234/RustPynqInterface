@@ -1,25 +1,167 @@
 use crate::{println64, print64};
 
 use crate::xil;
-use crate::LED_ADDRESS;
+//use crate::LED_ADDRESS;
 
 
 /// Table for dots. Indices are page, x, y, color. Initialized to zero.
 static mut DOTS: [[[u8; 3]; 8]; 8] = [[[0; 3]; 8]; 8];
 
-//pub const LED_ADDRESS: *mut u8 = 0x00000000 as *mut u8;
-//#define colcmd *(uint8_t *) 0x41220008
-pub const COLORSHIELD_ADDRESS: *mut u8 = 0x41220008 as *mut u8;
+// Memory address for colorshield functionality
+const COLORSHIELD_ADDRESS: *mut u8 = 0x41220008 as *mut u8;
 
-pub const CHANNEL_ADDRESS: *mut u8 = 0x41220000 as *mut u8;
+// Memory address for active channels
+const CHANNEL_ADDRESS: *mut u8 = 0x41220000 as *mut u8;
 
+// variable that indicates active channel
+static mut COLUMN: usize = 0b00000000;
+
+// return bit representation of active channel
+pub unsafe fn get_active_column_bit() -> u8 {
+    core::ptr::read_volatile(CHANNEL_ADDRESS)
+}
+
+// returns integer representation of active channel
+pub unsafe fn get_active_column_int() -> u8 {
+    match COLUMN {
+        0b1 => 1,
+        0b10 => 2,
+        0b100 => 3,
+        0b1000 => 4,
+        0b10000 => 5,
+        0b100000 => 6,
+        0b1000000 => 7,
+        0b10000000 => 8,
+        _ => 0,
+    }
+}
+
+pub unsafe fn set_active_column(col_number: u8) {
+    let translated: usize;
+    match col_number {
+        1 => {translated = 0b1},
+        2 => {translated = 0b10},
+        3 => {translated = 0b100},
+        4 => {translated = 0b1000},
+        5 => {translated = 0b10000},
+        6 => {translated = 0b100000},
+        7 => {translated = 0b1000000},
+        8 => {translated = 0b10000000},
+        _ => {translated = 0b0},
+    }
+    COLUMN = translated;
+    run(COLUMN);
+}
+
+pub unsafe fn set_next_column_active() {
+    // if no columns are active set first active
+    if COLUMN == 0 {
+        COLUMN = 0b1;
+    }
+    // if current column is the last activate the first column
+    else if COLUMN & 0b10000000 > 0 {
+        COLUMN >>= 7;   
+    }
+    // activate next column
+    else {
+        COLUMN <<= 1;
+    }
+
+    // run active column
+    run(COLUMN);
+}
+
+struct ColorShield {
+    memory_address: *mut u8,
+    input: bool,
+    clock: bool,
+    bank: bool,
+    latch: bool,
+    reset: bool,
+}
+
+impl ColorShield {
+
+    const fn constructor() -> ColorShield {
+        ColorShield {
+        memory_address: 0x41220008 as *mut u8,
+        input: false,
+        clock: false,
+        bank: false,
+        latch: false,
+        reset: false }
+    }
+
+    unsafe fn print_status(&self) {
+    println64!("Bits: {:05b}",core::ptr::read_volatile(self.memory_address));
+    println64!("-> colorshields active channels are:");
+    println64!("input = {}",self.input);
+    println64!("clock = {}",self.clock);
+    println64!("bank = {}" ,self.bank);
+    println64!("latch = {}",self.latch);
+    println64!("reset = {}",self.reset);
+    println64!();
+    }
+
+}
+
+pub unsafe fn color_shield_status() {
+    COLOR_SHIELD.print_status();
+}
+
+static mut COLOR_SHIELD: ColorShield = ColorShield::constructor();
+/*
+static mut COLOR_SHIELD: ColorShield = ColorShield {
+    memory_address: 0x41220008 as *mut u8,
+    input: false,
+    clock: false,
+    bank: false,
+    latch: false,
+    reset: false,
+};
+
+
+pub unsafe fn color_shield_status() {
+    println64!("Bits: {:05b}",core::ptr::read_volatile(COLOR_SHIELD.memory_address));
+    println64!("-> colorshields active channels are:");
+    println64!("input = {}",COLOR_SHIELD.input);
+    println64!("clock = {}",COLOR_SHIELD.clock);
+    println64!("bank = {}",COLOR_SHIELD.bank);
+    println64!("latch = {}",COLOR_SHIELD.latch);
+    println64!("reset = {}",COLOR_SHIELD.reset);
+    println64!();
+}
+
+pub unsafe fn set_input(value: bool) {
+    Colorinput = value;
+    if (input = true) {
+        
+    } else {
+
+    }
+}
+*/
+
+pub unsafe fn set_clock(value: bool) {
+
+}
+
+pub unsafe fn set_bank(value: bool) {
+
+}
+
+pub unsafe fn set_latch(value: bool) {
+
+}
+
+pub unsafe fn set_reset(value: bool) {
+
+}
+//statics for clock
+static mut IS_SETUP: bool = false;
 static mut SECONDS: u8 = 0;
 static mut MINUTES: u8 = 0;
 static mut HOURS: u8 = 0;
-
-
-const CLK_CTRL: *mut u8 = 0x00000000 as *mut u8;
-
 
 pub unsafe fn setup_led_matrix() {
     // Tip: use the following to set an ADDRESS to zero:
@@ -45,10 +187,10 @@ pub unsafe fn setup_led_matrix() {
     //set input 0, clock 0, shift bank low, latch low, reset off
     mutate_ptr(COLORSHIELD_ADDRESS, |x| x | 0b00001);
 
-    for i in 0..24 {
+    for _i in 0..24 {
         let mut brightness: u8 = 0b000111;
         
-        for x_ in 0..6 {
+        for _x in 0..6 {
             //set brightness accoring to its value
             if (brightness & 0b100000) > 0 { 
                 //input 1 tai 0 riippuen brightness arvosta
@@ -123,7 +265,7 @@ pub unsafe fn run(c: usize) {
 
 	for column in (0..8).rev()  { 
 		for rgb in (0..3).rev() {
-			if (DOTS[row][column][rgb] >= 1) {
+			if DOTS[row][column][rgb] >= 1 {
                 mutate_ptr(COLORSHIELD_ADDRESS, |x| x | 0b10000);
 			} else {
                 mutate_ptr(COLORSHIELD_ADDRESS, |x| x & !0b10000);
@@ -173,11 +315,16 @@ pub unsafe fn setup_clock(hours: u8, minutes: u8, seconds: u8) {
     MINUTES = minutes;
     SECONDS = seconds;
     clear_dots();
+    IS_SETUP = true;
 }
 
 pub unsafe fn run_clock() {
+    if IS_SETUP {
     increment_time();
     update_led_table();
+    } else {
+        setup_clock(0,0,0);
+    }
 }
 
 unsafe fn increment_time() {
@@ -210,9 +357,7 @@ unsafe fn update_led_table() {
     let mut hours: u8 = HOURS.clone();
     let mut hours1: u8 = hours % 10;
     hours = (hours - hours1) / 10;
-    // 
-    println64!("{}",seconds1);
-    println64!("{}",seconds);
+
 
     //seconds
     for x in 1..5 {

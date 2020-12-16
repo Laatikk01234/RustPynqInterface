@@ -50,7 +50,16 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
     // An unsafe block for setting up the LED-matrix using the C-API, and for
     // touching a static global.
     unsafe {
+        color_shield_status();
         setup_led_matrix();
+        color_shield_status();
+        println64!("{}",get_active_column_bit());
+        println64!("{}",get_active_column_int());
+        set_active_column(3);
+        println64!("Active column(s): {:08b}",get_active_column_bit());
+        println64!("Active column: {}",get_active_column_int());
+        
+        //println64!("Active column: {}",);
         // Setting a static global requires an `unsafe` block in Rust, because the
         // compiler cannot verify soundness in a case where an interrupt causes
         // simultaneous access from another thread. Thus we must make sure ourselves,
@@ -67,9 +76,8 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
     // Prints up to 64 characters using standard Rust [print formatting](https://doc.rust-lang.org/std/fmt/index.html).
     println64!("Hello Rust!");
-    unsafe {
-    setup_clock(0,0,0);
-    }
+
+    
     //println64!("{}",0b10000 & 0b01000);
 
     // Empty loop to keep the program running while the interrupt handlers do all the
@@ -117,15 +125,17 @@ pub unsafe extern "C" fn tick_handler(callback_ref: *mut c_void) {
     xil::Xil_ExceptionDisable();
 
     // TODO: Write code here
-     run(COLUMN);
-
+    /*
+        run(COLUMN);
+     
         if COLUMN & 0b10000000 > 0 {
             COLUMN >>= 7;
         
         } else {
             COLUMN <<= 1;
         }
-
+    */
+    set_next_column_active();
  
     // End of your code
 
@@ -149,8 +159,8 @@ pub unsafe extern "C" fn tick_handler(callback_ref: *mut c_void) {
 /// for details.
 pub unsafe extern "C" fn tick_handler_1(callback_ref: *mut c_void) {
     // TODO: Write code here
-    if (HIDASTIN >= 10) {
-        run_clock();
+    if HIDASTIN >= 10 {
+        //run_clock();
         HIDASTIN = 0;
     } else {
         HIDASTIN += 1;
