@@ -1,8 +1,10 @@
-use crate::{println64, print64};
+use crate::{print64, println64};
 
 use crate::xil;
 //use crate::LED_ADDRESS;
 
+//use colorshield;
+mod colorshield;
 
 //statics for clock
 static mut IS_SETUP: bool = false;
@@ -13,200 +15,65 @@ static mut HOURS: u8 = 0;
 /// Table for dots. Indices are page, x, y, color. Initialized to zero.
 static mut DOTS: [[[u8; 3]; 8]; 8] = [[[0; 3]; 8]; 8];
 
-// Memory address for colorshield functionality
-const COLORSHIELD_ADDRESS: *mut u8 = 0x41220008 as *mut u8;
-
 // ColorShield struct that is used to operate colorshield.
-static mut COLOR_SHIELD: ColorShield = ColorShield::constructor();
-
-// Memory address for active channels
-const CHANNEL_ADDRESS: *mut u8 = 0x41220000 as *mut u8;
-
-// variable that indicates active channel
-static mut COLUMN: usize = 0b00000000;
+static mut COLOR_SHIELD: colorshield::ColorShield = colorshield::ColorShield::new();
 
 // return bit representation of active channel
+#[allow(dead_code)]
 pub unsafe fn get_active_column_bit() -> u8 {
-    core::ptr::read_volatile(CHANNEL_ADDRESS)
+    COLOR_SHIELD.get_active_column_bit()
 }
 
 // returns integer representation of active channel
+#[allow(dead_code)]
 pub unsafe fn get_active_column_int() -> u8 {
-    match COLUMN {
-        0b1 => 1,
-        0b10 => 2,
-        0b100 => 3,
-        0b1000 => 4,
-        0b10000 => 5,
-        0b100000 => 6,
-        0b1000000 => 7,
-        0b10000000 => 8,
-        _ => 0,
-    }
+    COLOR_SHIELD.get_active_column_int()
 }
 
+#[allow(dead_code)]
 pub unsafe fn set_active_column(col_number: u8) {
-    let translated: usize;
-    match col_number {
-        1 => {translated = 0b1},
-        2 => {translated = 0b10},
-        3 => {translated = 0b100},
-        4 => {translated = 0b1000},
-        5 => {translated = 0b10000},
-        6 => {translated = 0b100000},
-        7 => {translated = 0b1000000},
-        8 => {translated = 0b10000000},
-        _ => {translated = 0b0},
-    }
-    COLUMN = translated;
-    run(COLUMN);
+    COLOR_SHIELD.set_active_column(col_number);
 }
 
+#[allow(dead_code)]
 pub unsafe fn set_next_column_active() {
-    // if no columns are active set first active
-    if COLUMN == 0 {
-        COLUMN = 0b1;
-    }
-    // if current column is the last activate the first column
-    else if COLUMN & 0b10000000 > 0 {
-        COLUMN >>= 7;   
-    }
-    // activate next column
-    else {
-        COLUMN <<= 1;
-    }
-
-    // run active column
-    run(COLUMN);
+    run(COLOR_SHIELD.next_activating_column());
 }
 
-struct ColorShield {
-    memory_address: *mut u8,
-    input: bool,
-    clock: bool,
-    bank: bool,
-    latch: bool,
-    reset: bool,
-}
-
-impl ColorShield {
-
-    const fn constructor() -> ColorShield {
-        ColorShield {
-        memory_address: 0x41220008 as *mut u8,
-        input: false,
-        clock: false,
-        bank: false,
-        latch: false,
-        reset: false }
-    }
-
-    unsafe fn print_status(&self) {
-    println64!("Bits: {:05b}",core::ptr::read_volatile(self.memory_address));
+pub fn color_shield_status() {
+    println64!("Bits: {:05b}", unsafe {
+        core::ptr::read_volatile(COLOR_SHIELD.memory_address)
+    });
     println64!("-> colorshields active channels are:");
-    println64!("input = {}",self.input);
-    println64!("clock = {}",self.clock);
-    println64!("bank = {}" ,self.bank);
-    println64!("latch = {}",self.latch);
-    println64!("reset = {}",self.reset);
+    println64!("input = {}", unsafe { COLOR_SHIELD.input });
+    println64!("clock = {}", unsafe { COLOR_SHIELD.clock });
+    println64!("bank = {}", unsafe { COLOR_SHIELD.bank });
+    println64!("latch = {}", unsafe { COLOR_SHIELD.latch });
+    println64!("reset = {}", unsafe { COLOR_SHIELD.reset });
     println64!();
-    }
-
-    unsafe fn set_input(&mut self, value: bool) {
-        self.input = value;
-            if self.input == true {
-                mutate_ptr(self.memory_address, |x| x | 0b10000);
-            } else {
-                mutate_ptr(self.memory_address, |x| x & !0b10000);
-            }
-    }
-
-    unsafe fn set_clock(&mut self, value: bool) {
-        self.clock = value;
-            if self.clock == true {
-                mutate_ptr(self.memory_address, |x| x | 0b01000);
-            } else {
-                mutate_ptr(self.memory_address, |x| x & !0b01000);
-            }
-    }
-
-    unsafe fn set_bank(&mut self, value: bool) {
-        self.bank = value;
-            if self.bank == true {
-                mutate_ptr(self.memory_address, |x| x | 0b00100);
-            } else {
-                mutate_ptr(self.memory_address, |x| x & !0b00100);
-            }
-    }
-
-    unsafe fn set_latch(&mut self, value: bool) {
-        self.latch = value;
-            if self.latch == true {
-                mutate_ptr(self.memory_address, |x| x | 0b00010);
-            } else {
-                mutate_ptr(self.memory_address, |x| x & !0b00010);
-            }
-    }
-
-    unsafe fn set_reset(&mut self, value: bool) {
-        self.reset = value;
-            if self.reset == true {
-                mutate_ptr(self.memory_address, |x| x | 0b00001);
-            } else {
-                mutate_ptr(self.memory_address, |x| x & !0b00001);
-            }
-    }
-
-    //reset
-    unsafe fn reset(&mut self) {
-        self.set_reset(false);
-        self.set_reset(true);
-    }
-
-    //tick_clock
-    unsafe fn tick_clock(&mut self) {
-        self.set_clock(false);
-        self.set_clock(true);
-    }
-
-    //latch
-    unsafe fn latch(&mut self) {
-        self.set_latch(true);
-        self.set_latch(false);
-    }
-
-    //activate 6-bit bank
-    unsafe fn activate_6_bit_bank(&mut self) {
-        self.set_bank(false);
-    }
-
-    //activate 8-bit bank
-    unsafe fn activate_8_bit_bank(&mut self) {
-        self.set_bank(true);
-    }
 }
 
-
-pub unsafe fn color_shield_status() {
-    COLOR_SHIELD.print_status();
-}
-
+#[allow(dead_code)]
 pub unsafe fn set_input(value: bool) {
     COLOR_SHIELD.set_input(value);
 }
 
+#[allow(dead_code)]
 pub unsafe fn set_clock(value: bool) {
     COLOR_SHIELD.set_clock(value);
 }
 
+#[allow(dead_code)]
 pub unsafe fn set_bank(value: bool) {
     COLOR_SHIELD.set_bank(value);
 }
 
+#[allow(dead_code)]
 pub unsafe fn set_latch(value: bool) {
     COLOR_SHIELD.set_latch(value);
 }
 
+#[allow(dead_code)]
 pub unsafe fn set_reset(value: bool) {
     COLOR_SHIELD.set_reset(value);
 }
@@ -257,52 +124,42 @@ pub unsafe fn setup_led_matrix() {
 /// Set the value of one pixel at the LED matrix. Function is unsafe because it
 /// uses global memory
 /// coordinates in range 1-8 and colors of 0,255.
-unsafe fn set_pixel(x: usize, y: usize, r: u8, g: u8, b: u8) {
+pub fn set_pixel(x: usize, y: usize, r: u8, g: u8, b: u8) {
     // Set new pixel value. Take the parameeters and put them into the
     // DOTS array.
 
-    if (x >= 1 && x <= 8)
-        && (y >= 1 && y <= 8) {
-        DOTS[x-1][y-1][0] = r;
-        DOTS[x-1][y-1][1] = g;
-        DOTS[x-1][y-1][2] = b;
-
+    if (x >= 1 && x <= 8) && (y >= 1 && y <= 8) {
+        unsafe {
+            DOTS[x - 1][y - 1][0] = r;
+            DOTS[x - 1][y - 1][1] = g;
+            DOTS[x - 1][y - 1][2] = b;
+        }
     } else {
-        println64!("Bad coordinate values: X: {}, Y: {}",x,y);
+        println64!("Bad coordinate values: X: {}, Y: {}", x, y);
     }
-
 }
 
 pub unsafe fn run(c: usize) {
-
     activate_8_bit_bank();
-
-    let column: usize = get_active_column_int() as usize - 1;
+    let column: usize = c - 1;
 
     //lights off for the duration of pushing new values to show
-    open_line(0);
-
-	for row in (0..8).rev()  { 
-		for rgb in (0..3).rev() {
-			if DOTS[column][row][rgb] >= 1 {
+    set_active_column(0);
+    for row in (0..8).rev() {
+        for rgb in (0..3).rev() {
+            if DOTS[column][row][rgb] >= 1 {
                 set_input(true);
-			} else {
+            } else {
                 set_input(false);
-			}
-			for _ in 0..8 {
+            }
+            for _ in 0..8 {
                 tick_clock();
-			}
-		}
-	}
-    
-	latch();
-    
-    open_line(c as u8);
-}
+            }
+        }
+    }
 
-/// Sets one line, matching with the parameter, as active.
-pub unsafe fn open_line(i: u8) {
-    core::ptr::write_volatile(CHANNEL_ADDRESS, i);
+    latch();
+    set_active_column(c as u8);
 }
 
 pub unsafe fn setup_clock(hours: u8, minutes: u8, seconds: u8) {
@@ -315,10 +172,10 @@ pub unsafe fn setup_clock(hours: u8, minutes: u8, seconds: u8) {
 
 pub unsafe fn run_clock() {
     if IS_SETUP {
-    increment_time();
-    update_led_table();
+        increment_time();
+        update_led_table();
     } else {
-        setup_clock(0,0,0);
+        setup_clock(0, 0, 0);
     }
 }
 
@@ -353,22 +210,21 @@ unsafe fn update_led_table() {
     let mut hours1: u8 = hours % 10;
     hours = (hours - hours1) / 10;
 
-
     //seconds
     for x in 1..5 {
         if seconds1 & 0b1 > 0 {
-            set_pixel(8,x as usize,0,0,1);
+            set_pixel(8, x as usize, 0, 0, 1);
         } else {
-            set_pixel(8,x as usize,0,0,0);
+            set_pixel(8, x as usize, 0, 0, 0);
         }
         seconds1 >>= 1;
     }
 
     for x in 1..4 {
         if seconds & 0b1 > 0 {
-            set_pixel(7,x as usize,0,0,1);
+            set_pixel(7, x as usize, 0, 0, 1);
         } else {
-            set_pixel(7,x as usize,0,0,0);
+            set_pixel(7, x as usize, 0, 0, 0);
         }
         seconds >>= 1;
     }
@@ -376,18 +232,18 @@ unsafe fn update_led_table() {
     //minutes
     for x in 1..5 {
         if minutes1 & 0b1 > 0 {
-            set_pixel(5,x as usize,0,1,0);
+            set_pixel(5, x as usize, 0, 1, 0);
         } else {
-            set_pixel(5,x as usize,0,0,0);
+            set_pixel(5, x as usize, 0, 0, 0);
         }
         minutes1 >>= 1;
     }
 
     for x in 1..4 {
         if minutes & 0b1 > 0 {
-            set_pixel(4,x as usize,0,1,0);
+            set_pixel(4, x as usize, 0, 1, 0);
         } else {
-            set_pixel(4,x as usize,0,0,0);
+            set_pixel(4, x as usize, 0, 0, 0);
         }
         minutes >>= 1;
     }
@@ -395,18 +251,18 @@ unsafe fn update_led_table() {
     //hours
     for x in 1..5 {
         if hours1 & 0b1 > 0 {
-            set_pixel(2,x as usize,1,0,0);
+            set_pixel(2, x as usize, 1, 0, 0);
         } else {
-            set_pixel(2,x as usize,0,0,0);
+            set_pixel(2, x as usize, 0, 0, 0);
         }
         hours1 >>= 1;
     }
 
     for x in 1..4 {
         if hours & 0b1 > 0 {
-            set_pixel(1,x as usize,1,0,0);
+            set_pixel(1, x as usize, 1, 0, 0);
         } else {
-            set_pixel(1,x as usize,0,0,0);
+            set_pixel(1, x as usize, 0, 0, 0);
         }
         hours >>= 1;
     }
@@ -420,14 +276,4 @@ pub unsafe fn clear_dots() {
             }
         }
     }
-}
-
-/// A helper one-liner for mutating raw pointers at given address. You shouldn't need to change this.
-unsafe fn mutate_ptr<A, F>(addr: *mut A, mutate_fn: F)
-where
-    F: FnOnce(A) -> A,
-{
-    let prev = core::ptr::read_volatile(addr);
-    let new = mutate_fn(prev);
-    core::ptr::write_volatile(addr, new);
 }

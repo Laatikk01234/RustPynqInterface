@@ -36,8 +36,6 @@ pub static mut HIDASTIN: usize = 1;
 // some of the provided documentation.
 pub const LED_ADDRESS: *mut u8 = 0x00000000 as *mut u8;
 
-
-
 // The #[start] attribute is usually not necessary, but we need to show the
 // cross-compiler where to start executing. The underscore before the argument
 // signals that the parameter is not used.
@@ -49,25 +47,25 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
     // An unsafe block for setting up the LED-matrix using the C-API, and for
     // touching a static global.
-    println64!("{}",unsafe {get_active_column_bit()});
-    println64!("{}",unsafe {get_active_column_int()});
+    println64!("{}", unsafe { get_active_column_bit() });
+    println64!("{}", unsafe { get_active_column_int() });
     unsafe {
         color_shield_status();
         setup_led_matrix();
         color_shield_status();
 
-        set_active_column(3);
+        set_active_column(4);
 
-        
         //println64!("Active column: {}",);
         // Setting a static global requires an `unsafe` block in Rust, because the
         // compiler cannot verify soundness in a case where an interrupt causes
         // simultaneous access from another thread. Thus we must make sure ourselves,
         // not to do that.
     }
-    println64!("Active column(s): {:08b}",unsafe {get_active_column_bit()});
-    println64!("Active column: {}",unsafe {get_active_column_int()});
-
+    println64!("Active column(s): {:08b}", unsafe {
+        get_active_column_bit()
+    });
+    println64!("Active column: {}", unsafe { get_active_column_int() });
 
     unsafe {
         // Enables the board to break execution of the main thread using an interrupt
@@ -79,8 +77,6 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
     // Prints up to 64 characters using standard Rust [print formatting](https://doc.rust-lang.org/std/fmt/index.html).
     println64!("Hello Rust!");
-
-    
     //println64!("{}",0b10000 & 0b01000);
 
     // Empty loop to keep the program running while the interrupt handlers do all the
@@ -95,7 +91,7 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
 ///
 /// * `status` - a binding containing one flipped bit to match the source of the
 ///   interrupt. See line comments of contained `match` statement.
-pub unsafe extern "C" fn button_handler(callback_ref: *mut c_void, _bank: u32, status: u32) {
+pub unsafe extern "C" fn button_handler(callback_ref: *mut c_void, _bank: u32, _status: u32) {
     // Don't mind me, line is for brevity
     // N.B. Removing this line is totally okay
     let _gpio = callback_ref as *mut xil::XGpioPs;
@@ -130,16 +126,16 @@ pub unsafe extern "C" fn tick_handler(callback_ref: *mut c_void) {
     // TODO: Write code here
     /*
         run(COLUMN);
-     
+
         if COLUMN & 0b10000000 > 0 {
             COLUMN >>= 7;
-        
+
         } else {
             COLUMN <<= 1;
         }
     */
     set_next_column_active();
- 
+
     // End of your code
 
     // Cast `void*` received from the C API to the "Triple Timer Counter" (TTC)
@@ -168,7 +164,7 @@ pub unsafe extern "C" fn tick_handler_1(callback_ref: *mut c_void) {
     } else {
         HIDASTIN += 1;
     }
-        
+
     // End of your code
 
     // Clear timer interrupt status

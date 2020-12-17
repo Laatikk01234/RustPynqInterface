@@ -228,7 +228,7 @@ fn setup_gpio_interrupt_system() -> u32 {
     // Return 0 for success
     0
 }
-
+#[allow(dead_code)]
 pub fn change_freq(freq: u32) {
     if freq != 0 {
         unsafe {
