@@ -49,15 +49,15 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
     // An unsafe block for setting up the LED-matrix using the C-API, and for
     // touching a static global.
+    println64!("{}",unsafe {get_active_column_bit()});
+    println64!("{}",unsafe {get_active_column_int()});
     unsafe {
         color_shield_status();
         setup_led_matrix();
         color_shield_status();
-        println64!("{}",get_active_column_bit());
-        println64!("{}",get_active_column_int());
+
         set_active_column(3);
-        println64!("Active column(s): {:08b}",get_active_column_bit());
-        println64!("Active column: {}",get_active_column_int());
+
         
         //println64!("Active column: {}",);
         // Setting a static global requires an `unsafe` block in Rust, because the
@@ -65,6 +65,9 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
         // simultaneous access from another thread. Thus we must make sure ourselves,
         // not to do that.
     }
+    println64!("Active column(s): {:08b}",unsafe {get_active_column_bit()});
+    println64!("Active column: {}",unsafe {get_active_column_int()});
+
 
     unsafe {
         // Enables the board to break execution of the main thread using an interrupt

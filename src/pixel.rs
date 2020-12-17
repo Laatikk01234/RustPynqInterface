@@ -114,7 +114,7 @@ impl ColorShield {
 
     unsafe fn set_input(&mut self, value: bool) {
         self.input = value;
-            if (self.input == true) {
+            if self.input == true {
                 mutate_ptr(self.memory_address, |x| x | 0b10000);
             } else {
                 mutate_ptr(self.memory_address, |x| x & !0b10000);
@@ -123,7 +123,7 @@ impl ColorShield {
 
     unsafe fn set_clock(&mut self, value: bool) {
         self.clock = value;
-            if (self.clock == true) {
+            if self.clock == true {
                 mutate_ptr(self.memory_address, |x| x | 0b01000);
             } else {
                 mutate_ptr(self.memory_address, |x| x & !0b01000);
@@ -132,7 +132,7 @@ impl ColorShield {
 
     unsafe fn set_bank(&mut self, value: bool) {
         self.bank = value;
-            if (self.bank == true) {
+            if self.bank == true {
                 mutate_ptr(self.memory_address, |x| x | 0b00100);
             } else {
                 mutate_ptr(self.memory_address, |x| x & !0b00100);
@@ -141,7 +141,7 @@ impl ColorShield {
 
     unsafe fn set_latch(&mut self, value: bool) {
         self.latch = value;
-            if (self.latch == true) {
+            if self.latch == true {
                 mutate_ptr(self.memory_address, |x| x | 0b00010);
             } else {
                 mutate_ptr(self.memory_address, |x| x & !0b00010);
@@ -150,7 +150,7 @@ impl ColorShield {
 
     unsafe fn set_reset(&mut self, value: bool) {
         self.reset = value;
-            if (self.reset == true) {
+            if self.reset == true {
                 mutate_ptr(self.memory_address, |x| x | 0b00001);
             } else {
                 mutate_ptr(self.memory_address, |x| x & !0b00001);
@@ -159,40 +159,30 @@ impl ColorShield {
 
     //reset
     unsafe fn reset(&mut self) {
-        unsafe {
-            self.set_reset(false);
-            self.set_reset(true);
-        }
+        self.set_reset(false);
+        self.set_reset(true);
     }
 
     //tick_clock
     unsafe fn tick_clock(&mut self) {
-        unsafe {
-            self.set_clock(false);
-            self.set_clock(true);
-        }
+        self.set_clock(false);
+        self.set_clock(true);
     }
 
     //latch
     unsafe fn latch(&mut self) {
-        unsafe {
-            self.set_latch(true);
-            self.set_latch(false);
-        }
+        self.set_latch(true);
+        self.set_latch(false);
     }
 
     //activate 6-bit bank
     unsafe fn activate_6_bit_bank(&mut self) {
-        unsafe {
-            self.set_bank(false);
-        }
+        self.set_bank(false);
     }
 
     //activate 8-bit bank
     unsafe fn activate_8_bit_bank(&mut self) {
-        unsafe {
-            self.set_bank(true);
-        }
+        self.set_bank(true);
     }
 }
 
@@ -262,7 +252,6 @@ pub unsafe fn setup_led_matrix() {
         }
     }
     latch();
-
 }
 
 /// Set the value of one pixel at the LED matrix. Function is unsafe because it
@@ -288,26 +277,14 @@ pub unsafe fn run(c: usize) {
 
     activate_8_bit_bank();
 
-
-    let row: usize;
-    match c {
-        0b1 => {row = 0},
-        0b10 => {row = 1},
-        0b100 => {row = 2},
-        0b1000 => {row = 3},
-        0b10000 => {row = 4},
-        0b100000 => {row = 5},
-        0b1000000 => {row = 6},
-        0b10000000 => {row = 7},
-        _ => {row = 0},
-    }
+    let column: usize = get_active_column_int() as usize - 1;
 
     //lights off for the duration of pushing new values to show
     open_line(0);
 
-	for column in (0..8).rev()  { 
+	for row in (0..8).rev()  { 
 		for rgb in (0..3).rev() {
-			if DOTS[row][column][rgb] >= 1 {
+			if DOTS[column][row][rgb] >= 1 {
                 set_input(true);
 			} else {
                 set_input(false);
@@ -320,13 +297,7 @@ pub unsafe fn run(c: usize) {
     
 	latch();
     
-
     open_line(c as u8);
-
-
-
-    // TODO: Write into the LED matrix driver (8-bit data). Use values from DOTS
-    // array.
 }
 
 /// Sets one line, matching with the parameter, as active.
