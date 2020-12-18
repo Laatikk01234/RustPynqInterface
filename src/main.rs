@@ -135,7 +135,6 @@ pub unsafe extern "C" fn tick_handler(callback_ref: *mut c_void) {
         }
     */
     set_next_column_active();
-    run_clock();
 
     // End of your code
 
@@ -160,7 +159,7 @@ pub unsafe extern "C" fn tick_handler(callback_ref: *mut c_void) {
 pub unsafe extern "C" fn tick_handler_1(callback_ref: *mut c_void) {
     // TODO: Write code here
     if HIDASTIN >= 10 {
-        //run_clock();
+        run_clock();
         HIDASTIN = 0;
     } else {
         HIDASTIN += 1;
